@@ -1,4 +1,3 @@
-#include <GLFW/glfw3.h>
 #include <GLES3/gl3.h>
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
@@ -8,19 +7,10 @@
 
 #include <cstdio>
 
-void error_callback(int error, const char* description)
-{
-    fprintf(stderr, "Error: %s\n", description);
-}
-
-static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GLFW_TRUE);
-}
+#include "Window.h"
 
 struct State {
-    GLFWwindow* window = nullptr;
+    Window window;
     GLuint vertex_buffer,  program;
     GLint mvp_location, vpos_location, vcol_location;
 } state;
@@ -59,23 +49,9 @@ static const char* fragment_shader_text =
 "}\n";
 
 void setup() {
-    if (!glfwInit())
-    {
+    if (!state.window.init()) {
         return;
     }
-    glfwSetErrorCallback(error_callback);
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-    state.window = glfwCreateWindow(640, 480, "My Title", NULL, NULL);
-    if (!state.window) {
-        return;
-    }
-    glfwSetKeyCallback(state.window, key_callback);
-    glfwMakeContextCurrent(state.window);
-    glfwSwapInterval(1);
-
-
     glGenBuffers(1, &state.vertex_buffer);
     glBindBuffer(GL_ARRAY_BUFFER, state.vertex_buffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -130,38 +106,28 @@ void setup() {
 }
 
 void cleanup() {
-    if (state.window) {
-        glfwDestroyWindow(state.window);
-    }
-    glfwTerminate();
+    state.window.cleanup();
+}
+
+void loop(float time, int width, int height) {
+    float ratio;
+    glm::mat4 m, p, mvp;
+
+    ratio = width / (float) height;
+    glViewport(0, 0, width, height);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    m = glm::rotate(glm::mat4(1.0f), (float) time, {0.0f, 0.0f, 1.0f});
+    p = glm::ortho(-ratio, ratio, -1.f, 1.f, 1.f, -1.f);
+    mvp = p * m;
+
+    glUseProgram(state.program);
+    glUniformMatrix4fv(state.mvp_location, 1, GL_FALSE, glm::value_ptr(mvp));
+    glDrawArrays(GL_TRIANGLES, 0, 3);
 }
 
 void run() {
-    if (!state.window) {
-        return;
-    }
-    while (!glfwWindowShouldClose(state.window)) {
-        // Keep running
-        double time = glfwGetTime();
-        int width, height;
-        float ratio;
-        glm::mat4 m, p, mvp;
- 
-        glfwGetFramebufferSize(state.window, &width, &height);
-        ratio = width / (float) height;
-        glViewport(0, 0, width, height);
-        glClear(GL_COLOR_BUFFER_BIT);
- 
-        m = glm::rotate(glm::mat4(1.0f), (float) time, {0.0f, 0.0f, 1.0f});
-        p = glm::ortho(-ratio, ratio, -1.f, 1.f, 1.f, -1.f);
-        mvp = p * m;
- 
-        glUseProgram(state.program);
-        glUniformMatrix4fv(state.mvp_location, 1, GL_FALSE, glm::value_ptr(mvp));
-        glDrawArrays(GL_TRIANGLES, 0, 3);
- 
-        glfwSwapBuffers(state.window);
-        glfwPollEvents();
+    while (state.window.loop(loop)) {
     }
 }
 
